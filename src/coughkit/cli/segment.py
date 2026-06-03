@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """Segment a recording into individual cough .wav files."""
 
-import argparse
 import os
 
 import librosa
 import soundfile as sf
 
+from coughkit.cli import common
 from coughkit.segmentation import segment_cough
 
 
@@ -31,14 +31,21 @@ def segment(input_file, dir_output='./', fs_out=16000):
     return paths
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser):
     parser.add_argument('-i', '--input_file', help='input file', required=True)
     parser.add_argument('-o', '--output_dir', help='output directory',
                         default='./', type=str)
     parser.add_argument('-fs', '--fs_out', help='output sampling rate',
                         default=16000, type=int)
-    args = parser.parse_args(argv)
+    return parser
+
+
+def build_parser(prog=None):
+    return common.build_parser(add_arguments, __doc__, prog=prog)
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     segment(args.input_file, args.output_dir, args.fs_out)
 
 

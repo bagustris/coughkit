@@ -1,10 +1,7 @@
 import numpy as np
 import librosa
-from scipy import signal
-from scipy.io import wavfile
-from scipy.signal import butter,filtfilt
-from scipy.stats import kurtosis
 import scipy.signal as signal
+from scipy.signal import butter, filtfilt
 try:
     from scipy.integrate import simps
 except ImportError:

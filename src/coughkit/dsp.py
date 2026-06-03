@@ -6,6 +6,14 @@ from .features import features
 
 MIN_FEATURE_SAMPLES = 2048
 
+# Frequency bands and feature-function order. This exact ordering is
+# load-bearing: the bundled scaler and classifier were trained on the resulting
+# 68-feature vector. scripts/train_classifier.py mirrors these constants.
+FREQ_CUTS = [(0, 200), (300, 425), (500, 650), (950, 1150),
+             (1400, 1800), (2300, 2400), (2850, 2950), (3800, 3900)]
+FEATURE_FCT_LIST = ['EEPD', 'ZCR', 'RMSP', 'DF', 'spectral_features',
+                    'SF_SSTD', 'SSL_SD', 'MFCC', 'CF', 'LGTH', 'PSD']
+
 
 def classify_cough(x, fs, model, scaler):
     """Classify whether an inputted signal is a cough or not using filtering, feature extraction, and ML classification
@@ -25,11 +33,9 @@ def classify_cough(x, fs, model, scaler):
         return 0
 
     data = (fs,x)
-    FREQ_CUTS = [(0,200),(300,425),(500,650),(950,1150),(1400,1800),(2300,2400),(2850,2950),(3800,3900)]
-    features_fct_list = ['EEPD','ZCR','RMSP','DF','spectral_features','SF_SSTD','SSL_SD','MFCC','CF','LGTH','PSD']
     feature_values_vec = []
     obj = features(FREQ_CUTS)
-    for feature in features_fct_list:
+    for feature in FEATURE_FCT_LIST:
         feature_values, feature_names = getattr(obj,feature)(data)
         for value in feature_values:
             if isinstance(value,np.ndarray):

@@ -32,25 +32,28 @@ pip install -e '.[dev]'
 pip install -e '.[train]'
 ```
 
-This installs the `coughkit` package plus three console commands: `cough-detect`, `cough-segment`, and `cough-count`. The core dependencies use `xgboost-cpu`, so GPU-only packages such as `nvidia-nccl-cu12` are not required for CPU inference.
+This installs the `coughkit` package plus the primary `coughkit` console command. The older `cough-detect`, `cough-segment`, and `cough-count` commands are still installed as compatibility aliases. The core dependencies use `xgboost-cpu`, so GPU-only packages such as `nvidia-nccl-cu12` are not required for CPU inference.
 
 ## API/Command Line Usage
 
 ```
+# Show the installed toolkit version:
+coughkit --version
+
 # Detect cough (probability that the file contains a cough):
-cough-detect -i input_file.wav
+coughkit detect -i input_file.wav
 
 # Segment coughs into a chosen output directory:
-cough-segment -i input_file.wav -o output_segments/
+coughkit segment -i input_file.wav -o output_segments/
 
 # Count cough events in a file:
-cough-count -i input_file.wav
+coughkit count -i input_file.wav
 
 # Count cough events from the microphone (stop with Ctrl+C):
-cough-count -m
+coughkit count -m
 ```
 
-Each command is also runnable as a module, e.g. `python -m coughkit.cli.detect -i input_file.wav`.
+The compatibility aliases remain available, e.g. `cough-detect -i input_file.wav`. The top-level command is also runnable as a module, e.g. `python -m coughkit detect -i input_file.wav`.
 
 ## Python Usage
 ```
@@ -69,11 +72,11 @@ print(f"{input_file} has probability of cough: {prob}")
 # Example
 ```
 # detect cough:
-cough-detect -i data/sample_recordings/cough.wav
+coughkit detect -i data/sample_recordings/cough.wav
 data/sample_recordings/cough.wav has probability of cough: 0.995194137096405
 
 # segment cough
-cough-segment -i data/sample_recordings/cough.wav -o output_segments/
+coughkit segment -i data/sample_recordings/cough.wav -o output_segments/
 Write to output_segments/cough-0.wav
 Write to output_segments/cough-1.wav
 ```
@@ -106,7 +109,7 @@ The reusable library lives in `src/coughkit/`:
 - `coughkit/segmentation.py` — `segment_cough` (hysteresis comparator) and `compute_SNR`.
 - `coughkit/models.py` — loaders for the bundled classifier and scaler.
 - `coughkit/audio_io.py` — COUGHVID `.webm`/`.ogg` → `.wav` conversion (requires ffmpeg) and microphone capture.
-- `coughkit/cli/` — the `cough-detect`, `cough-segment`, and `cough-count` entry points.
+- `coughkit/cli/` — the `coughkit` command and legacy `cough-detect`, `cough-segment`, and `cough-count` entry points.
 
 Offline tooling lives in `scripts/`:
 

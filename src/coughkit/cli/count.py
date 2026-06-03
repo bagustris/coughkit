@@ -6,12 +6,12 @@ Pipeline: segment high-energy regions → classify each segment → count those
 above a probability threshold.
 """
 
-import argparse
 from pathlib import Path
 
 import librosa
 
 from coughkit.audio_io import record_mic
+from coughkit.cli import common
 from coughkit.dsp import classify_cough
 from coughkit.models import load_cough_classifier, load_scaler
 from coughkit.segmentation import segment_cough
@@ -32,6 +32,8 @@ def count(input_file=None, use_mic=False, duration=None, fs_out=16000,
     """Return the number of segments classified as a cough above *threshold*."""
     if use_mic:
         x, fs = record_mic(duration=duration, fs=fs_out)
+    elif input_file is None:
+        raise ValueError("Provide input_file or set use_mic=True.")
     else:
         x, fs = _load_file(input_file, fs_out=fs_out)
 
@@ -55,9 +57,7 @@ def count(input_file=None, use_mic=False, duration=None, fs_out=16000,
     return cough_count
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-
+def add_arguments(parser):
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument('-i', '--input', metavar='FILE',
                         help='Path to input audio file')
@@ -74,8 +74,15 @@ def main(argv=None):
                              f'cough (default: {DEFAULT_THRESHOLD})')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print per-segment probability and classification')
+    return parser
 
-    args = parser.parse_args(argv)
+
+def build_parser(prog=None):
+    return common.build_parser(add_arguments, __doc__, prog=prog)
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     count(input_file=args.input, use_mic=args.mic, duration=args.duration,
           fs_out=args.fs_out, threshold=args.threshold, verbose=args.verbose)
 

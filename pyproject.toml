@@ -23,6 +23,7 @@ dev = ["pytest>=8", "tqdm"]
 train = ["pandas>=2.2", "tqdm"]
 
 [project.scripts]
+coughkit = "coughkit.cli.main:main"
 cough-detect = "coughkit.cli.detect:main"
 cough-segment = "coughkit.cli.segment:main"
 cough-count = "coughkit.cli.count:main"

@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """Detect whether an audio file contains a cough (returns a probability)."""
 
-import argparse
 from pathlib import Path
 
 from scipy.io import wavfile
 
+from coughkit.cli import common
 from coughkit.dsp import classify_cough
 from coughkit.models import load_cough_classifier, load_scaler
 
@@ -26,11 +26,18 @@ def detect(input_file):
     return prob
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+def add_arguments(parser):
     parser.add_argument('-i', '--input', required=True,
                         help='Path to input audio file')
-    args = parser.parse_args(argv)
+    return parser
+
+
+def build_parser(prog=None):
+    return common.build_parser(add_arguments, __doc__, prog=prog)
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     detect(args.input)
 
 
