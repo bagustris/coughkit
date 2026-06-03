@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coughkit"
+version = "0.1.0"
+description = "Detect, segment, and count cough sounds in audio recordings."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.1",
+    "scipy>=1.14",
+    "librosa>=0.11",
+    "soundfile>=0.12.1",
+    "scikit-learn>=1.6",
+    "xgboost-cpu>=2.1",
+    "pandas>=2.2",
+    "sounddevice>=0.4",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "tqdm"]
+
+[project.scripts]
+cough-detect = "coughkit.cli.detect:main"
+cough-segment = "coughkit.cli.segment:main"
+cough-count = "coughkit.cli.count:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

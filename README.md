@@ -17,43 +17,43 @@ The original bundled classifier pickle (`models/cough_classifier`) was produced 
 
 # Installation
 
-First, install the Python library dependencies in a virtual environment via pip or uv.
+Install the package (and its dependencies) into a virtual environment with pip or uv. An editable install (`-e`) is recommended so the bundled models in `models/` resolve correctly:
 
 ```
-pip install -r requirements.txt
+pip install -e .
 # or
-uv pip install -r requirements.txt
+uv pip install -e .
 ```
 
-`requirements.txt` uses `xgboost-cpu`, so GPU-only dependencies such as `nvidia-nccl-cu12` are not required for normal CPU inference.
+This installs the `coughkit` package plus three console commands: `cough-detect`, `cough-segment`, and `cough-count`. The dependencies use `xgboost-cpu`, so GPU-only packages such as `nvidia-nccl-cu12` are not required for CPU inference.
 
-## API/Command Line Usage 
-  
+## API/Command Line Usage
+
 ```
-# Detect cough:
-python3 detect_cough.py -i input_file.wav
-
-# Segment coughs into the current directory:
-python3 segment_cough.py -i input_file.wav
+# Detect cough (probability that the file contains a cough):
+cough-detect -i input_file.wav
 
 # Segment coughs into a chosen output directory:
-python3 segment_cough.py -i input_file.wav -o output_segments/
-```
- 
-## Python Usage
-``` 
-from detect_cough import load_cough_classifier
-from src.DSP import classify_cough
-from scipy.io import wavfile
-import pickle
-from pathlib import Path
+cough-segment -i input_file.wav -o output_segments/
 
-input_file = './sample_recordings/cough.wav'
-scaler_path = Path('./models/cough_classification_scaler')
+# Count cough events in a file:
+cough-count -i input_file.wav
+
+# Count cough events from the microphone (stop with Ctrl+C):
+cough-count -m
+```
+
+Each command is also runnable as a module, e.g. `python -m coughkit.cli.detect -i input_file.wav`.
+
+## Python Usage
+```
+from coughkit import classify_cough, load_cough_classifier, load_scaler
+from scipy.io import wavfile
+
+input_file = './data/sample_recordings/cough.wav'
 
 model = load_cough_classifier()
-with scaler_path.open('rb') as scaler_file:
-    scaler = pickle.load(scaler_file)
+scaler = load_scaler()
 
 fs, x = wavfile.read(input_file)
 prob = classify_cough(x, fs, model, scaler)
@@ -62,13 +62,13 @@ print(f"{input_file} has probability of cough: {prob}")
 # Example
 ```
 # detect cough:
-python3 detect_cough.py -i sample_recordings/cough.wav
-sample_recordings/cough.wav has probability of cough: 0.995194137096405
+cough-detect -i data/sample_recordings/cough.wav
+data/sample_recordings/cough.wav has probability of cough: 0.995194137096405
 
 # segment cough
-python3 segment_cough.py -i sample_recordings/cough.wav
-Write to ./cough-0.wav
-Write to ./cough-1.wav
+cough-segment -i data/sample_recordings/cough.wav -o output_segments/
+Write to output_segments/cough-0.wav
+Write to output_segments/cough-1.wav
 ```
 
 You may see an `InconsistentVersionWarning` from `scikit-learn` when loading the legacy scaler. This warning is expected with modern environments and does not prevent detection from running.
@@ -92,29 +92,27 @@ The `segmentation_and_SNR_example.ipynb` notebook is an example of how to use th
 
 ## Source code
 
-### Convert files
+The reusable library lives in `src/coughkit/`:
 
-A quick function to automatically convert all of the compressed .webm and .ogg files in the COUGHVID dataset to the more usable .wav format. Note: you must have FFMPEG installed for this to work. 
+- `coughkit/dsp.py` — signal preprocessing plus `classify_cough` (filter → 68-feature extraction → scale → XGBoost probability).
+- `coughkit/features.py` — the `features` class computing all audio features used for cough classification.
+- `coughkit/segmentation.py` — `segment_cough` (hysteresis comparator) and `compute_SNR`.
+- `coughkit/models.py` — loaders for the bundled classifier and scaler.
+- `coughkit/audio_io.py` — COUGHVID `.webm`/`.ogg` → `.wav` conversion (requires ffmpeg) and microphone capture.
+- `coughkit/cli/` — the `cough-detect`, `cough-segment`, and `cough-count` entry points.
 
-### DSP
+Offline tooling lives in `scripts/`:
 
-This file contains all-digital signal processing functions, including filtering the recordings and classifying between cough sounds and non-cough sounds.
-
-### Features
-
-This file contains all of the functions used for the computation of audio signal features commonly used in cough classification.
-
-### Segmentation
-
-This file contains a function for segmenting a recording into individual cough signals and additional code to compute the SNR of the recording.
+- `scripts/train_classifier.py` — reproduce the classifier + scaler from the COUGHVID dataset.
+- `scripts/convert_model_to_json.py` — migrate the legacy XGBoost 0.90 pickle to modern JSON.
 
 ## Models
 
-- `models/cough_classifier_migrated.json`: modern XGBoost model used by `detect_cough.py`.
+- `models/cough_classifier_migrated.json`: modern XGBoost model loaded at runtime.
 - `models/cough_classifier`: original legacy XGBoost 0.90 pickle, kept for provenance/backward compatibility.
 - `models/cough_classification_scaler`: feature scaler used before classification.
 
-Use `detect_cough.load_cough_classifier()` instead of loading `models/cough_classifier` directly. Loading the legacy pickle directly with modern XGBoost will fail.
+Use `coughkit.load_cough_classifier()` instead of loading `models/cough_classifier` directly. Loading the legacy pickle with modern XGBoost will fail.
 
 
 # Citation 

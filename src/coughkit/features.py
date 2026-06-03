@@ -124,7 +124,9 @@ class features:
         names = ['Dominant_Freq']
         fs,cough = data
         cough_fortan = np.asfortranarray(cough)
-        freqs, psd = signal.welch(cough_fortan, fs=fs)
+        # Preserve the legacy normalized-frequency scale used by the bundled
+        # scaler and classifier.
+        freqs, psd = signal.welch(cough_fortan)
         DF = freqs[np.argmax(psd)]
         return  np.ones((1,1))*DF, names
     
@@ -143,7 +145,8 @@ class features:
 
         #spectral roloff = frequency below which 95% of signal energy lies
         cumsum_mag = np.cumsum(magnitudes)
-        spec_rolloff = freqs[np.min(np.where(cumsum_mag >= 0.95*sum_mag)[0])]
+        # Preserve the legacy feature value: rolloff bin index, not Hz.
+        spec_rolloff = np.min(np.where(cumsum_mag >= 0.95*sum_mag)[0])
 
         #spectral spread = weighted standard deviation of frequencies wrt FFT value
         spec_spread = np.sqrt(np.sum(((freqs-spec_centroid)**2)*magnitudes) / sum_mag)
@@ -248,4 +251,3 @@ class features:
         feat = np.array(feat)
         feat_names = [f'PSD_{lf}-{hf}' for lf, hf in self.FREQ_CUTS]
         return feat, feat_names
-    

@@ -2,15 +2,15 @@ import numpy as np
 
 #Use old segmentation
 def segment_cough(x,fs, cough_padding=0.2,min_cough_len=0.2, th_l_multiplier = 0.1, th_h_multiplier = 2):
-    """Preprocess the data by segmenting each file into individual coughs using a hysteresis comparator on the signal power
+    """Preprocess the data by segmenting each file into individual coughs using a hysteresis comparator
     
     Inputs:
     *x (np.array): cough signal
     *fs (float): sampling frequency in Hz
     *cough_padding (float): number of seconds added to the beginning and end of each detected cough to make sure coughs are not cut short
     *min_cough_length (float): length of the minimum possible segment that can be considered a cough
-    *th_l_multiplier (float): multiplier of the mean signal power used as a low threshold of the hysteresis comparator
-    *th_h_multiplier (float): multiplier of the mean signal power used as a high threshold of the hysteresis comparator
+    *th_l_multiplier (float): multiplier of the RMS energy used as a low threshold of the hysteresis comparator
+    *th_h_multiplier (float): multiplier of the RMS energy used as a high threshold of the hysteresis comparator
     
     Outputs:
     *coughSegments (np.array of np.arrays): a list of cough signal arrays corresponding to each cough
@@ -24,9 +24,9 @@ def segment_cough(x,fs, cough_padding=0.2,min_cough_len=0.2, th_l_multiplier = 0
 
     # define hysteresis thresholds
     signal_power = np.square(x)
-    mean_signal_power = np.mean(signal_power)
-    seg_th_l = th_l_multiplier * mean_signal_power
-    seg_th_h = th_h_multiplier * mean_signal_power
+    rms = np.sqrt(np.mean(signal_power))
+    seg_th_l = th_l_multiplier * rms
+    seg_th_h = th_h_multiplier * rms
 
     # segment coughs
     coughSegments = []

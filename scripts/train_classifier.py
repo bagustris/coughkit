@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 """Reproduce the bundled cough classifier and feature scaler.
 
-This script rebuilds the two artifacts under ``models/`` from scratch:
+This script rebuilds the model artifacts under ``models/`` from scratch:
 
     models/cough_classifier              -> xgboost.XGBClassifier (binary:logistic)
     models/cough_classification_scaler   -> sklearn StandardScaler (68 features)
+    models/cough_classifier_migrated.json -> modern XGBoost model used at runtime
 
 It mirrors the *exact* 68-feature vector and ordering used at inference time by
-``src.DSP.classify_cough`` (EEPD, ZCR, RMSP, DF, spectral_features, SF_SSTD,
+``coughkit.dsp.classify_cough`` (EEPD, ZCR, RMSP, DF, spectral_features, SF_SSTD,
 SSL_SD, MFCC, CF, LGTH, PSD), fits a StandardScaler, then trains an
 XGBClassifier using the hyperparameters recovered from the original pickle:
 
@@ -31,10 +32,10 @@ own ground truth via ``--labels-csv``/``--label-col`` if you have it.
 USAGE
 -----
     # COUGHVID reconstruction (derive labels from expert quality columns):
-    python3 train_classifier.py --coughvid-dir /path/to/coughvid_wav/
+    python3 scripts/train_classifier.py --coughvid-dir /path/to/coughvid_wav/
 
     # Generic: your own labels CSV (binary 0/1 in --label-col, file id in --id-col)
-    python3 train_classifier.py --data-dir wavs/ --labels-csv labels.csv \
+    python3 scripts/train_classifier.py --data-dir wavs/ --labels-csv labels.csv \
         --id-col uuid --label-col is_cough
 """
 
@@ -44,11 +45,13 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 from scipy.io import wavfile
 
-from src.DSP import preprocess_cough
-from src.feature_class import features
+# Allow running directly (python scripts/train_classifier.py) without installing.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from coughkit.dsp import preprocess_cough
+from coughkit.features import features
 
 try:
     from tqdm import tqdm
@@ -56,7 +59,7 @@ except ImportError:  # tqdm is optional
     def tqdm(it, **_kwargs):
         return it
 
-# ---- These MUST match src/DSP.py:classify_cough exactly to reproduce the model
+# ---- These MUST match coughkit.dsp.classify_cough exactly to reproduce the model
 FREQ_CUTS = [(0, 200), (300, 425), (500, 650), (950, 1150),
              (1400, 1800), (2300, 2400), (2850, 2950), (3800, 3900)]
 FEATURE_FCT_LIST = ['EEPD', 'ZCR', 'RMSP', 'DF', 'spectral_features',
@@ -86,7 +89,7 @@ XGB_PARAMS = dict(
 def extract_features(x, fs):
     """Return the 68-dim feature vector for one signal, in the model's order.
 
-    This replicates the body of ``src.DSP.classify_cough`` (minus the
+    This replicates the body of ``coughkit.dsp.classify_cough`` (minus the
     scaler/model steps) so that training features are byte-for-byte comparable
     to what the deployed classifier sees.
     """
@@ -164,6 +167,8 @@ def main():
                     help="Binary 0/1 label column in --labels-csv (default: label).")
     ap.add_argument('--out-model', default='models/cough_classifier')
     ap.add_argument('--out-scaler', default='models/cough_classification_scaler')
+    ap.add_argument('--out-json', default='models/cough_classifier_migrated.json',
+                    help="Modern XGBoost JSON model loaded by coughkit at runtime.")
     ap.add_argument('--features-cache',
                     help="Optional .npz path to cache/reuse extracted X,y.")
     ap.add_argument('--test-size', type=float, default=0.2)
@@ -177,6 +182,7 @@ def main():
         X, y = cache['X'], cache['y']
     else:
         if args.coughvid_dir:
+            import pandas as pd
             data_dir = args.coughvid_dir
             meta_path = Path(args.coughvid_dir) / 'metadata_compiled.csv'
             if not meta_path.is_file():
@@ -184,6 +190,7 @@ def main():
             meta = pd.read_csv(meta_path)
             labels_df = derive_coughvid_labels(meta, id_col=args.id_col)
         elif args.data_dir and args.labels_csv:
+            import pandas as pd
             data_dir = args.data_dir
             labels_df = pd.read_csv(args.labels_csv).rename(
                 columns={args.label_col: 'label'})
@@ -229,14 +236,14 @@ def main():
 
     # ---- Persist (pickle, matching the original artifact format) ---------
     Path(args.out_model).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out_scaler, 'wb') as f:
         pickle.dump(scaler, f)
     with open(args.out_model, 'wb') as f:
         pickle.dump(clf, f)
-    # Also drop a modern, version-proof JSON next to the pickle.
-    clf.get_booster().save_model(args.out_model + '.json')
+    clf.save_model(args.out_json)
     print(f"\nSaved:\n  {args.out_scaler}\n  {args.out_model}"
-          f"\n  {args.out_model}.json (modern XGBoost format)")
+          f"\n  {args.out_json} (modern XGBoost format)")
 
 
 if __name__ == '__main__':

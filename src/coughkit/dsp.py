@@ -2,7 +2,9 @@ import numpy as np
 import librosa
 from scipy.signal import butter,filtfilt
 
-from .feature_class import features 
+from .features import features
+
+MIN_FEATURE_SAMPLES = 2048
 
 
 def classify_cough(x, fs, model, scaler):
@@ -19,6 +21,9 @@ def classify_cough(x, fs, model, scaler):
         return 0
 
     x,fs = preprocess_cough(x,fs)
+    if x.size < MIN_FEATURE_SAMPLES:
+        return 0
+
     data = (fs,x)
     FREQ_CUTS = [(0,200),(300,425),(500,650),(950,1150),(1400,1800),(2300,2400),(2850,2950),(3800,3900)]
     features_fct_list = ['EEPD','ZCR','RMSP','DF','spectral_features','SF_SSTD','SSL_SD','MFCC','CF','LGTH','PSD']
@@ -60,7 +65,7 @@ def preprocess_cough(x,fs, cutoff = 6000, normalize = True, filter_ = True, down
     x = x.astype(np.float32, copy=False)
     if normalize:
         x = x/(np.max(np.abs(x))+1e-17)                # Norm to range between -1 to 1
-    if filter_ and fs > fs_downsample:
+    if filter_ and fs > fs_downsample and x.size > 15:
         b, a = butter(4, fs_downsample/fs, btype='lowpass') # 4th order butter lowpass filter
         x = filtfilt(b, a, x)
     if downsample and fs != fs_downsample:

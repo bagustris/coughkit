@@ -12,9 +12,9 @@ This script bridges the gap WITHOUT requiring you to manually manage a second
 environment. It uses ``uv`` to spin up a throwaway interpreter pinned to the
 *old* xgboost/scikit-learn/numpy, loads the legacy pickle there, and exports:
 
-    models/cough_classifier.json              <- portable booster (modern format)
-    models/cough_classifier_meta.json         <- wrapper attrs (classes_, params)
-    models/cough_classification_scaler.json   <- scaler mean_/scale_/var_
+    models/cough_classifier_migrated.json      <- portable booster (runtime model)
+    models/cough_classifier_migrated_meta.json <- wrapper attrs (classes_, params)
+    models/cough_classification_scaler.json    <- scaler mean_/scale_/var_
 
 It then re-loads the JSON in THIS (modern) environment and verifies that
 ``predict_proba`` matches the legacy model on random inputs.
@@ -60,7 +60,7 @@ with open(model_path, "rb") as f:
     clf = pickle.load(f)
 
 booster = clf.get_booster()
-booster.save_model(f"{out_dir}/cough_classifier.json")
+booster.save_model(f"{out_dir}/cough_classifier_migrated.json")
 
 def jsonable(v):
     if isinstance(v, np.ndarray):
@@ -87,7 +87,7 @@ probe = rng.rand(8, int(n_feat)).astype(np.float32)
 meta["probe_X"] = probe.tolist()
 meta["probe_proba"] = clf.predict_proba(probe)[:, 1].tolist()
 
-with open(f"{out_dir}/cough_classifier_meta.json", "w") as f:
+with open(f"{out_dir}/cough_classifier_migrated_meta.json", "w") as f:
     json.dump(meta, f, indent=2)
 
 # Scaler -> plain JSON (loads fine in modern sklearn but JSON is version-proof).
@@ -140,9 +140,9 @@ def verify_modern(out_dir, tol):
     except ImportError:
         print("xgboost not importable here; skipping verification.")
         return
-    meta = json.loads((out_dir / "cough_classifier_meta.json").read_text())
+    meta = json.loads((out_dir / "cough_classifier_migrated_meta.json").read_text())
     clf = XGBClassifier()
-    clf.load_model(str(out_dir / "cough_classifier.json"))
+    clf.load_model(str(out_dir / "cough_classifier_migrated.json"))
 
     probe = np.asarray(meta["probe_X"], dtype=np.float32)
     expected = np.asarray(meta["probe_proba"], dtype=np.float64)
@@ -181,8 +181,8 @@ def main():
         sys.exit(f"Model not found: {model_path}")
 
     export_with_legacy_env(model_path, scaler_path, out_dir)
-    print(f"\nWrote:\n  {out_dir/'cough_classifier.json'}"
-          f"\n  {out_dir/'cough_classifier_meta.json'}"
+    print(f"\nWrote:\n  {out_dir/'cough_classifier_migrated.json'}"
+          f"\n  {out_dir/'cough_classifier_migrated_meta.json'}"
           f"\n  {out_dir/'cough_classification_scaler.json'}")
 
     if not args.no_verify:
@@ -190,7 +190,7 @@ def main():
 
     print("\nLoad it in modern XGBoost with:")
     print("    from xgboost import XGBClassifier")
-    print(f"    clf = XGBClassifier(); clf.load_model('{out_dir/'cough_classifier.json'}')")
+    print(f"    clf = XGBClassifier(); clf.load_model('{out_dir/'cough_classifier_migrated.json'}')")
 
 
 if __name__ == "__main__":
