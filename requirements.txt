@@ -1,2 +1,8 @@
-xgboost==0.90
-scipy==0.22.1
+numpy>=2.1
+scipy>=1.14
+librosa>=0.11
+soundfile>=0.12.1
+scikit-learn>=1.6
+xgboost-cpu>=2.1
+pandas>=2.2
+sounddevice>=0.4

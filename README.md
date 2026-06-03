@@ -1,46 +1,59 @@
-
 # Detect and Segment Cough
-This repository hosts the codes and models to **detect** and **segment** cough sounds. As the names suggest, detecting a cough returns the probability of a given audio file containing a cough sound. Segment cough returns audio files containing a single segmented cough sound from given an audio file with many cough sounds (output of detect cough). These two methods (detect and segment cough) are the most important building blocks for developing cough-based diagnosis tools such as COVID-19. 
+This repository hosts code and models to **detect** and **segment** cough sounds. Detecting a cough returns the probability that an audio file contains cough sounds. Segmenting coughs writes separate WAV files for individual detected cough events in an input recording.
 
 
-# Input-output 
-Input: audio files (.wav) to be predicted to have (multiple) cough sound  
-Output: Cough or non-cough (detect), new wav files containing segmented cough
+# Input-output
+
+- Input: audio files (`.wav`) that may contain one or more cough sounds.
+- Output:
+  - Detection: cough probability for the input file.
+  - Segmentation: new WAV files containing individual cough segments.
 
 # **Supported Python Version and Model** (IMPORTANT!)
-I tested that this model works on Python version >= 3.7.0.  
-Less than the version above (e.g., python3.6), the output probability will be "0". The xgboost package must be version 0.90.
 
-# Installation: 
+The current `requirements.txt` targets modern Python versions, including Python 3.13, and uses CPU-only XGBoost via `xgboost-cpu`.
 
-First, install the Python library dependencies in a virtual environment via pip.
+The original bundled classifier pickle (`models/cough_classifier`) was produced with XGBoost 0.90, which cannot be unpickled by modern XGBoost. Runtime detection now loads `models/cough_classifier_migrated.json`, a stable model-IO export migrated from that legacy pickle. The scaler (`models/cough_classification_scaler`) is still an older `scikit-learn` pickle, so Python may warn when loading it with newer packages. Treat model outputs from a newer runtime as compatibility-sensitive and validate them against known recordings before production use.
+
+# Installation
+
+First, install the Python library dependencies in a virtual environment via pip or uv.
 
 ```
 pip install -r requirements.txt
+# or
+uv pip install -r requirements.txt
 ```
+
+`requirements.txt` uses `xgboost-cpu`, so GPU-only dependencies such as `nvidia-nccl-cu12` are not required for normal CPU inference.
 
 ## API/Command Line Usage 
   
 ```
 # Detect cough:
 python3 detect_cough.py -i input_file.wav
-# Segment cough: 
-python3 segment_cough -i input_file.wav
+
+# Segment coughs into the current directory:
+python3 segment_cough.py -i input_file.wav
+
+# Segment coughs into a chosen output directory:
+python3 segment_cough.py -i input_file.wav -o output_segments/
 ```
  
 ## Python Usage
 ``` 
-# detect cough, see notebooks for segment cough
-import sys
-sys.path.append('./src')
-from src.feature_class import features
+from detect_cough import load_cough_classifier
 from src.DSP import classify_cough
 from scipy.io import wavfile
 import pickle
+from pathlib import Path
 
 input_file = './sample_recordings/cough.wav'
-model = pickle.load(open('./models/cough_classifier', 'rb'))
-scaler = pickle.load(open('./models/cough_classification_scaler', 'rb'))
+scaler_path = Path('./models/cough_classification_scaler')
+
+model = load_cough_classifier()
+with scaler_path.open('rb') as scaler_file:
+    scaler = pickle.load(scaler_file)
 
 fs, x = wavfile.read(input_file)
 prob = classify_cough(x, fs, model, scaler)
@@ -49,19 +62,16 @@ print(f"{input_file} has probability of cough: {prob}")
 # Example
 ```
 # detect cough:
-bagus@L140MU:detect-cough$ /usr/bin/python3 detect_cough.py -i sample_recordings/cough.wav
-/home/bagus/.local/lib/python3.8/site-packages/sklearn/base.py:329: UserWarning: Trying to unpickle estimator LabelEncoder from version 0.22.1 when using version 1.0.2. This might lead to breaking code or invalid results. Use at your own risk. For more info, please refer to:
-https://scikit-learn.org/stable/modules/model_persistence.html#security-maintainability-limitations
-  warnings.warn(
-/home/bagus/.local/lib/python3.8/site-packages/sklearn/base.py:329: UserWarning: Trying to unpickle estimator StandardScaler from version 0.22.1 when using version 1.0.2. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
-https://scikit-learn.org/stable/modules/model_persistence.html#security-maintainability-limitations
-  warnings.warn(
-sample_recordings/cough.wav has probability of cough: 0.988208472728729
+python3 detect_cough.py -i sample_recordings/cough.wav
+sample_recordings/cough.wav has probability of cough: 0.995194137096405
+
 # segment cough
-bagus@L140MU:detect-cough$ ./segment_cough.py -i sample_recordings/cough.wav
+python3 segment_cough.py -i sample_recordings/cough.wav
 Write to ./cough-0.wav
 Write to ./cough-1.wav
 ```
+
+You may see an `InconsistentVersionWarning` from `scikit-learn` when loading the legacy scaler. This warning is expected with modern environments and does not prevent detection from running.
 
 # Overview: 
 
@@ -100,7 +110,11 @@ This file contains a function for segmenting a recording into individual cough s
 
 ## Models
 
-The  `cough_classifier` is an XGB model that can be loaded and used in the `classify_cough` function to classify whether or not a given recording contains cough sounds. The `cough_classification_scaler` is a feature scaler also used in this function.
+- `models/cough_classifier_migrated.json`: modern XGBoost model used by `detect_cough.py`.
+- `models/cough_classifier`: original legacy XGBoost 0.90 pickle, kept for provenance/backward compatibility.
+- `models/cough_classification_scaler`: feature scaler used before classification.
+
+Use `detect_cough.load_cough_classifier()` instead of loading `models/cough_classifier` directly. Loading the legacy pickle directly with modern XGBoost will fail.
 
 
 # Citation 

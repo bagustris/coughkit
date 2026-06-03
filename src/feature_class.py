@@ -5,7 +5,13 @@ from scipy.io import wavfile
 from scipy.signal import butter,filtfilt
 from scipy.stats import kurtosis
 import scipy.signal as signal
-from scipy.integrate import simps
+try:
+    from scipy.integrate import simps
+except ImportError:
+    from scipy.integrate import simpson
+
+    def simps(y, dx=1.0):
+        return simpson(y, dx=dx)
 
 # Class that contains the feature computation functions 
 
@@ -118,7 +124,7 @@ class features:
         names = ['Dominant_Freq']
         fs,cough = data
         cough_fortan = np.asfortranarray(cough)
-        freqs, psd = signal.welch(cough_fortan)
+        freqs, psd = signal.welch(cough_fortan, fs=fs)
         DF = freqs[np.argmax(psd)]
         return  np.ones((1,1))*DF, names
     
@@ -129,16 +135,20 @@ class features:
         length = len(x)
         freqs = np.abs(np.fft.fftfreq(length, 1.0/fs)[:length//2+1]) # positive frequencies
         sum_mag = np.sum(magnitudes)
+        if sum_mag == 0:
+            return np.zeros(6), names
         
         # spectral centroid = weighted mean of frequencies wrt FFT value at each frequency
         spec_centroid = np.sum(magnitudes*freqs) / sum_mag
 
         #spectral roloff = frequency below which 95% of signal energy lies
         cumsum_mag = np.cumsum(magnitudes)
-        spec_rolloff = np.min(np.where(cumsum_mag >= 0.95*sum_mag)[0]) 
+        spec_rolloff = freqs[np.min(np.where(cumsum_mag >= 0.95*sum_mag)[0])]
 
         #spectral spread = weighted standard deviation of frequencies wrt FFT value
         spec_spread = np.sqrt(np.sum(((freqs-spec_centroid)**2)*magnitudes) / sum_mag)
+        if spec_spread == 0:
+            return np.array([spec_centroid, spec_rolloff, spec_spread, 0, 0, 0]), names
 
         #spectral skewness = distribution of the spectrum around its mean
         spec_skewness = np.sum(((freqs-spec_centroid)**3)*magnitudes) / ((spec_spread**3)*sum_mag)
@@ -215,7 +225,7 @@ class features:
         fs, cough = data
         peak = np.amax(np.absolute(cough))
         RMS = np.sqrt(np.mean(np.square(cough)))
-        return np.ones((1,1))*peak/RMS, ['Crest_Factor']
+        return np.ones((1,1))*(0 if RMS == 0 else peak/RMS), ['Crest_Factor']
     
     def LGTH(self,data):
         "Compute the length of the segment in seconds"
@@ -234,7 +244,7 @@ class features:
         for lf, hf in self.FREQ_CUTS:
             idx_band = np.logical_and(freqs >= lf, freqs <= hf)
             band_power = simps(psd[idx_band], dx=dx_freq)
-            feat.append(band_power/total_power)
+            feat.append(0 if total_power == 0 else band_power/total_power)
         feat = np.array(feat)
         feat_names = [f'PSD_{lf}-{hf}' for lf, hf in self.FREQ_CUTS]
         return feat, feat_names
