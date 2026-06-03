@@ -1,9 +1,15 @@
 import pytest
 
+from coughkit import __version__
 from coughkit.cli import count as count_cli
 from coughkit.cli import detect as detect_cli
 from coughkit.cli import main as main_cli
 from coughkit.cli import segment as segment_cli
+from coughkit.cli.common import get_version
+
+
+def test_cli_version_matches_package_version():
+    assert get_version() == __version__
 
 
 def test_top_level_version_flag(capsys):

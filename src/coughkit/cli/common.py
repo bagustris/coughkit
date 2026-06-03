@@ -2,18 +2,18 @@
 
 import argparse
 from functools import lru_cache
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import version
 
 
 @lru_cache(maxsize=None)
 def get_version():
-    """Return the installed coughkit version, with a source-tree fallback."""
+    """Return the package version, with installed metadata as a fallback."""
     try:
-        return version("coughkit")
-    except PackageNotFoundError:
         from coughkit import __version__
 
         return __version__
+    except ImportError:
+        return version("coughkit")
 
 
 def add_version_argument(parser):

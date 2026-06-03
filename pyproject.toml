@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coughkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Detect, segment, and count cough sounds in audio recordings."
 readme = "README.md"
 requires-python = ">=3.10"
