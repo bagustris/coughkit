@@ -20,12 +20,19 @@ The original bundled classifier pickle (`models/cough_classifier`) was produced 
 Install the package (and its dependencies) into a virtual environment with pip or uv. An editable install (`-e`) is recommended so the bundled models in `models/` resolve correctly:
 
 ```
+# Inference-only (minimal dependencies):
 pip install -e .
 # or
 uv pip install -e .
+
+# With development tools (pytest, tqdm):
+pip install -e '.[dev]'
+
+# With training tools (pandas, required for scripts/train_classifier.py):
+pip install -e '.[train]'
 ```
 
-This installs the `coughkit` package plus three console commands: `cough-detect`, `cough-segment`, and `cough-count`. The dependencies use `xgboost-cpu`, so GPU-only packages such as `nvidia-nccl-cu12` are not required for CPU inference.
+This installs the `coughkit` package plus three console commands: `cough-detect`, `cough-segment`, and `cough-count`. The core dependencies use `xgboost-cpu`, so GPU-only packages such as `nvidia-nccl-cu12` are not required for CPU inference.
 
 ## API/Command Line Usage
 
