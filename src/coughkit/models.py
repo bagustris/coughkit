@@ -7,10 +7,12 @@ This is resolved relative to the installed package (works for editable
 locations.
 """
 
+import json
 import os
 import pickle
 from pathlib import Path
 
+import numpy as np
 from xgboost import XGBClassifier
 
 
@@ -26,6 +28,38 @@ MODEL_DIR = _default_model_dir()
 MIGRATED_MODEL_PATH = MODEL_DIR / "cough_classifier_migrated.json"
 LEGACY_MODEL_PATH = MODEL_DIR / "cough_classifier"
 SCALER_PATH = MODEL_DIR / "cough_classification_scaler"
+SCALER_JSON_PATH = MODEL_DIR / "cough_classification_scaler.json"
+
+
+class NumpyStandardScaler:
+    """Small runtime equivalent of sklearn.preprocessing.StandardScaler."""
+
+    def __init__(self, mean, scale, var=None, with_mean=True, with_std=True,
+                 n_features=None):
+        self.mean_ = np.asarray(mean, dtype=np.float64)
+        self.scale_ = np.asarray(scale, dtype=np.float64)
+        self.var_ = None if var is None else np.asarray(var, dtype=np.float64)
+        self.with_mean = with_mean
+        self.with_std = with_std
+        self.n_features_in_ = (
+            int(n_features) if n_features is not None else len(self.mean_)
+        )
+
+    def transform(self, x):
+        x = np.asarray(x, dtype=np.float64)
+        if x.ndim != 2:
+            raise ValueError("Expected a 2D array for scaler.transform().")
+        if x.shape[1] != self.n_features_in_:
+            raise ValueError(
+                f"Expected {self.n_features_in_} features, got {x.shape[1]}."
+            )
+
+        transformed = x.copy()
+        if self.with_mean:
+            transformed -= self.mean_
+        if self.with_std:
+            transformed /= self.scale_
+        return transformed
 
 
 def load_cough_classifier():
@@ -56,5 +90,17 @@ def load_cough_classifier():
 
 def load_scaler():
     """Load the StandardScaler used to scale the 68-feature vector."""
+    if SCALER_JSON_PATH.is_file():
+        with SCALER_JSON_PATH.open() as scaler_file:
+            scaler = json.load(scaler_file)
+        return NumpyStandardScaler(
+            mean=scaler["mean_"],
+            scale=scaler["scale_"],
+            var=scaler.get("var_"),
+            with_mean=scaler.get("with_mean", True),
+            with_std=scaler.get("with_std", True),
+            n_features=scaler.get("n_features"),
+        )
+
     with SCALER_PATH.open("rb") as scaler_file:
         return pickle.load(scaler_file)

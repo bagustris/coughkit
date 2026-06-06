@@ -40,6 +40,7 @@ USAGE
 """
 
 import argparse
+import json
 import pickle
 import sys
 from pathlib import Path
@@ -84,6 +85,22 @@ XGB_PARAMS = dict(
     objective='binary:logistic',
     booster='gbtree',
 )
+
+
+def save_scaler_json(scaler, path):
+    """Persist scaler state in the runtime JSON format."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = {
+        "mean_": scaler.mean_.tolist(),
+        "scale_": scaler.scale_.tolist(),
+        "var_": scaler.var_.tolist() if scaler.var_ is not None else None,
+        "with_mean": bool(scaler.with_mean),
+        "with_std": bool(scaler.with_std),
+        "n_features": int(len(scaler.mean_)),
+    }
+    with path.open("w") as f:
+        json.dump(data, f, indent=2)
 
 
 def extract_features(x, fs):
@@ -167,6 +184,9 @@ def main():
                     help="Binary 0/1 label column in --labels-csv (default: label).")
     ap.add_argument('--out-model', default='models/cough_classifier')
     ap.add_argument('--out-scaler', default='models/cough_classification_scaler')
+    ap.add_argument('--out-scaler-json',
+                    default='models/cough_classification_scaler.json',
+                    help="Version-proof JSON scaler loaded at runtime.")
     ap.add_argument('--out-json', default='models/cough_classifier_migrated.json',
                     help="Modern XGBoost JSON model loaded by coughkit at runtime.")
     ap.add_argument('--features-cache',
@@ -239,11 +259,13 @@ def main():
     Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
     with open(args.out_scaler, 'wb') as f:
         pickle.dump(scaler, f)
+    save_scaler_json(scaler, args.out_scaler_json)
     with open(args.out_model, 'wb') as f:
         pickle.dump(clf, f)
     clf.save_model(args.out_json)
     print(f"\nSaved:\n  {args.out_scaler}\n  {args.out_model}"
-          f"\n  {args.out_json} (modern XGBoost format)")
+          f"\n  {args.out_json} (modern XGBoost format)"
+          f"\n  {args.out_scaler_json} (runtime scaler format)")
 
 
 if __name__ == '__main__':
