@@ -1,77 +1,63 @@
+"""Cough segmentation and SNR.
+
+The hysteresis-comparator segmenter and the mask-based SNR formula originally
+lived here. They now live in the shared ``audiokit`` package as
+``energy_vad`` and ``compute_snr``; the functions below are thin wrappers that
+preserve coughkit's historical API:
+
+* ``segment_cough`` returns the cough audio sub-arrays (not just indices), as
+  callers (``cli/segment.py``, ``cli/count.py``) expect.
+* ``compute_SNR`` keeps its original name and signature.
+"""
+
 import numpy as np
+from audiokit import compute_snr as _compute_snr
+from audiokit import energy_vad
 
-#Use old segmentation
-def segment_cough(x,fs, cough_padding=0.2,min_cough_len=0.2, th_l_multiplier = 0.1, th_h_multiplier = 2):
-    """Preprocess the data by segmenting each file into individual coughs using a hysteresis comparator
-    
+
+def segment_cough(
+    x,
+    fs,
+    cough_padding=0.2,
+    min_cough_len=0.2,
+    th_l_multiplier=0.1,
+    th_h_multiplier=2,
+):
+    """Segment a recording into individual coughs using a hysteresis comparator.
+
     Inputs:
-    *x (np.array): cough signal
-    *fs (float): sampling frequency in Hz
-    *cough_padding (float): number of seconds added to the beginning and end of each detected cough to make sure coughs are not cut short
-    *min_cough_length (float): length of the minimum possible segment that can be considered a cough
-    *th_l_multiplier (float): multiplier of the RMS energy used as a low threshold of the hysteresis comparator
-    *th_h_multiplier (float): multiplier of the RMS energy used as a high threshold of the hysteresis comparator
-    
+    * x (np.array): cough signal
+    * fs (float): sampling frequency in Hz
+    * cough_padding (float): seconds added to each side of a detected cough
+    * min_cough_len (float): minimum length of a segment considered a cough
+    * th_l_multiplier (float): low hysteresis threshold as a multiple of RMS
+    * th_h_multiplier (float): high hysteresis threshold as a multiple of RMS
+
     Outputs:
-    *coughSegments (np.array of np.arrays): a list of cough signal arrays corresponding to each cough
-    cough_mask (np.array): an array of booleans that are True at the indices where a cough is in progress"""
+    * cough_segments (list of np.array): one signal array per detected cough
+    * cough_mask (np.array of bool): True where a cough is in progress
+
+    Detection is delegated to ``audiokit.energy_vad``; the sample-index
+    segments it returns are sliced from ``x`` to reproduce the original
+    array-returning behaviour.
+    """
     x = np.asarray(x)
-    cough_mask = np.array([False]*len(x))
+    segments, cough_mask = energy_vad(
+        x,
+        fs,
+        padding=cough_padding,
+        min_len=min_cough_len,
+        low_mult=th_l_multiplier,
+        high_mult=th_h_multiplier,
+    )
+    cough_segments = [x[start:end] for start, end in segments]
+    return cough_segments, cough_mask
 
-    if len(x) == 0:
-        return [], cough_mask
-    
-
-    # define hysteresis thresholds
-    signal_power = np.square(x)
-    rms = np.sqrt(np.mean(signal_power))
-    seg_th_l = th_l_multiplier * rms
-    seg_th_h = th_h_multiplier * rms
-
-    # segment coughs
-    coughSegments = []
-    padding = round(fs*cough_padding)
-    min_cough_samples = round(fs*min_cough_len)
-    cough_start = 0
-    cough_end = 0
-    cough_in_progress = False
-    tolerance = round(0.01*fs)
-    below_th_counter = 0
-    
-    for i, sample in enumerate(signal_power):
-        if cough_in_progress:
-            # counting and adding cough samples
-            if sample<seg_th_l:
-                below_th_counter += 1
-                if below_th_counter > tolerance:
-                    cough_end = i+padding if (i+padding < len(x)) else len(x)-1
-                    cough_in_progress = False
-                    if (cough_end+1-cough_start-2*padding>min_cough_samples):
-                        coughSegments.append(x[cough_start:cough_end+1])
-                        cough_mask[cough_start:cough_end+1] = True
-            # cough end
-            elif i == (len(x)-1):
-                cough_end=i
-                cough_in_progress = False
-                if (cough_end+1-cough_start-2*padding>min_cough_samples):
-                    coughSegments.append(x[cough_start:cough_end+1])
-                    cough_mask[cough_start:cough_end+1] = True
-            # reset counter for number of sample tolerance 
-            else:
-                below_th_counter = 0
-        else:
-            # start cough
-            if sample>seg_th_h:
-                cough_start = i-padding if (i-padding >=0) else 0
-                cough_in_progress = True
-                below_th_counter = 0
-    
-    return coughSegments, cough_mask
 
 def compute_SNR(x, fs):
-    """Compute the Signal-to-Noise ratio of the audio signal x (np.array) with sampling frequency fs (float)"""
-    segments, cough_mask = segment_cough(x,fs)
-    RMS_signal = 0 if len(x[cough_mask])==0 else np.sqrt(np.mean(np.square(x[cough_mask])))
-    RMS_noise = 0 if len(x[~cough_mask])==0 else np.sqrt(np.mean(np.square(x[~cough_mask])))
-    SNR = 0 if (RMS_signal==0 or RMS_noise==0 or np.isnan(RMS_noise)) else 20*np.log10(RMS_signal/RMS_noise)
-    return SNR
+    """Compute the Signal-to-Noise ratio of signal ``x`` (sample rate ``fs``).
+
+    Delegates to ``audiokit.compute_snr`` (mask-based RMS signal/noise using
+    the same hysteresis segmentation).
+    """
+    return _compute_snr(x, fs)

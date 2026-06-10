@@ -16,6 +16,7 @@ dependencies = [
     "scikit-learn>=1.6",
     "xgboost-cpu>=2.1",
     "sounddevice>=0.4",
+    "audiokit",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,13 @@ coughkit = "coughkit.cli.main:main"
 cough-detect = "coughkit.cli.detect:main"
 cough-segment = "coughkit.cli.segment:main"
 cough-count = "coughkit.cli.count:main"
+
+# audiokit is a local sibling package providing the shared audio plumbing
+# (energy-VAD + SNR live there now). Resolved via path for local development;
+# uv reads this source, so use `uv sync` or `uv pip install -e ../audiokit`
+# before `uv pip install -e .`.
+[tool.uv.sources]
+audiokit = { path = "../audiokit", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]
